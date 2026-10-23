@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketing Control - Input Kegiatan Harian v1.3</title>
+<style>
+  :root {
+    --bg: #eef1f6; --card: #ffffff; --ink: #1c2430; --muted: #667085; --line: #d9dee7;
+    --accent: #3b6fd4; --accent-soft: #e8effc; --danger: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161c; --card: #1b212a; --ink: #e8ecf2; --muted: #98a2b3;
+      --line: #2e3744; --accent-soft: #232c3b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px; line-height: 1.5;
+  }
+
+  /* ===== LAYOUT UTAMA: kiri | tengah (scroll internal) | kanan ===== */
+  .app {
+    height: 100dvh; max-width: 1700px; margin: 0 auto; padding: 14px; gap: 14px;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 250px;
+    grid-template-areas: "side main sum";
+  }
+  .side { grid-area: side; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .main { grid-area: main; min-height: 0; display: flex; flex-direction: column; }
+  .sum  { grid-area: sum;  overflow-y: auto; min-height: 0; }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .panel h2 { margin: 0 0 10px; font-size: 16px; }
+
+  /* Judul */
+  .brand { display: flex; gap: 12px; align-items: center; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 11px; background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 18px; flex: none; transition: background .2s;
+  }
+  .brand h1 { margin: 0; font-size: 17px; line-height: 1.25; }
+  .brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+  /* Informasi global */
+  .field + .field { margin-top: 12px; }
+  .lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  input[type=text], input[type=tel], input[type=date], select {
+    width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .dept { display: grid; gap: 6px; }
+  .dept label {
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-weight: 600;
+  }
+  .dept input { accent-color: var(--accent); }
+  .dept label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .dot { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  .note { color: var(--muted); font-size: 12.5px; margin: 4px 0 0; }
+  .msg-err { color: var(--danger); font-size: 13px; margin-top: 4px; display: none; }
+  .msg-err.show { display: block; }
+  .invalid { border-color: var(--danger) !important; }
+
+  /* Area tengah: navigasi + scroll internal */
+  .nav {
+    flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 8px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px 10px 0 0;
+  }
+  .nav button {
+    flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: #fff; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font-weight: 700; font-size: 13px;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+  .nav button:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  .nav button.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .badge {
+    min-width: 22px; padding: 1px 7px; border-radius: 999px; font-size: 12px; text-align: center; font-weight: 700;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .nav button.on .badge { background: rgba(255,255,255,.22); color: #fff; }
+  .badge.zero { display: none; }
+  .scroller {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 12px;
+    background: var(--card); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px;
+    scroll-behavior: smooth;
+  }
+  .sec { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--card); scroll-margin-top: 14px; }
+  .sec:last-child { margin-bottom: 0; }
+  .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -12px -12px 12px; padding: 12px; border-bottom: 1px solid var(--line); border-radius: 9px 9px 0 0; background: linear-gradient(100deg, var(--accent-soft), var(--card) 85%); }
+  .sec-head h2 { margin: 0; font-size: 16px; color: var(--accent); }
+  .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+
+  /* Tabel */
+  .tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; min-width: 560px; }
+  th { background: var(--accent); color: #fff; text-align: left; font-size: 12px; padding: 9px 8px; white-space: nowrap; transition: background .2s; }
+  td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.no { width: 40px; text-align: center; color: var(--muted); padding-top: 12px; }
+  td.act { width: 40px; text-align: center; }
+  td input[type=file] { font-size: 12px; width: 100%; max-width: 230px; }
+  td textarea { width: 100%; min-width: 130px; min-height: 38px; resize: vertical; padding: 8px 9px; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
+  td input[type=text], td input[type=tel], td select { min-width: 90px; padding: 8px 9px; font-size: 13px; }
+  .money-wrap { display: flex; align-items: center; min-width: 125px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); overflow: hidden; }
+  .money-wrap .rp { padding: 0 0 0 9px; color: var(--muted); font-size: 12px; }
+  .money-wrap input[type=text] { min-width: 75px; border: 0; outline: 0; box-shadow: none; }
+  .money-wrap:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .thumbs { font-size: 12px; color: var(--muted); margin-top: 4px; word-break: break-word; }
+  .thumbs.err { color: var(--danger); }
+  .upload-note { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  button { font: inherit; cursor: pointer; border-radius: 6px; }
+  .btn-add { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); padding: 6px 12px; font-weight: 700; white-space: nowrap; }
+  .btn-del { background: none; border: 1px solid transparent; color: var(--muted); font-size: 18px; line-height: 1; padding: 6px 8px; }
+  .btn-del:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* Ringkasan (kanan) */
+  .sum ul { margin: 0 0 14px; padding: 0; list-style: none; }
+  .sum li { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .sum li.zero { color: var(--muted); }
+  .sum li b { font-variant-numeric: tabular-nums; }
+  .sum li.total { border-bottom: 0; font-weight: 700; padding-top: 10px; }
+  .sum .btns { display: grid; gap: 8px; }
+  .btn-save { background: var(--accent); color: #fff; border: 0; padding: 11px 16px; font-weight: 700; }
+  .btn-save:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-reset { background: none; border: 1px solid var(--line); color: var(--ink); padding: 9px 16px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+    padding: 10px 16px; border-radius: 8px; max-width: 90vw; display: none; z-index: 10;
+  }
+  #toast.show { display: block; }
+  #toast.error { background: var(--danger); color: #fff; }
+
+  /* ===== Layar menengah: ringkasan pindah ke bawah area tengah ===== */
+  @media (max-width: 1199px) {
+    .app {
+      grid-template-columns: 270px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "side main" "side sum";
+    }
+    .sum { overflow: visible; }
+    .sum ul { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+    .sum li { border: 0; padding: 2px 0; gap: 6px; }
+    .sum li.total { padding-top: 2px; }
+    .sum .btns { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ===== HP: tampilan bertumpuk, halaman scroll biasa ===== */
+  @media (max-width: 760px) {
+    html, body { height: auto; }
+    .app { height: auto; display: flex; flex-direction: column; padding: 10px; gap: 10px; }
+    .side { overflow: visible; }
+    .main { display: block; }
+    .nav { position: sticky; top: 0; z-index: 5; border-radius: 10px; margin-bottom: 10px; border: 1px solid var(--line); }
+    .scroller { overflow: visible; padding: 0; border: 0; background: none; }
+    .sec { scroll-margin-top: 60px; }
+    .sum .btns { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { .scroller { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- KIRI: judul + informasi global (selalu terlihat) -->
+  <aside class="side">
+    <div class="panel brand">
+      <div class="logo" id="logo" aria-hidden="true">MC</div>
+      <div>
+        <h1>Marketing Control - Input Kegiatan Harian</h1>
+        <p>Input seluruh kegiatan dalam satu halaman</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Informasi global</h2>
+      <div class="field">
+        <label class="lbl" for="namaUser">Nama user</label>
+        <select id="namaUser">
+          <option value="">- Pilih nama -</option>
+          <option>Nando</option><option>Bunga</option><option>Wisan</option><option>Rika</option>
+        </select>
+        <div class="msg-err" id="err-nama">Pilih nama user terlebih dahulu.</div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="tanggal">Tanggal</label>
+        <input type="date" id="tanggal">
+        <p class="note">Jika tanggal tidak dipilih, sistem memakai hari ini.</p>
+      </div>
+      <div class="field">
+        <span class="lbl">Departemen</span>
+        <div class="dept" id="dept">
+          <label><input type="radio" name="dept" value="Pancasula" data-color="#3b6fd4"><span class="dot" style="background:#3b6fd4"></span>Pancasula</label>
+          <label><input type="radio" name="dept" value="Litani" data-color="#2e9e5b"><span class="dot" style="background:#2e9e5b"></span>Litani</label>
+          <label><input type="radio" name="dept" value="Daharan" data-color="#c99a06"><span class="dot" style="background:#e2b517"></span>Daharan</label>
+        </div>
+        <div class="msg-err" id="err-dept">Pilih salah satu departemen.</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- TENGAH: tabel input dengan scroll internal -->
+  <main class="main">
+    <nav class="nav" id="nav" aria-label="Lompat ke bagian"></nav>
+    <div class="scroller" id="sections"></div>
+  </main>
+
+  <!-- KANAN: ringkasan + tombol (selalu terlihat) -->
+  <aside class="sum panel">
+    <h2>Status / ringkasan</h2>
+    <ul id="summary"></ul>
+    <div class="btns">
+      <button type="button" class="btn-save" id="btnSave">Simpan semua kegiatan</button>
+      <button type="button" class="btn-reset" id="btnReset">Reset form</button>
+    </div>
+  </aside>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Marketing Control v1.3 - UI tabel + Google Apps Script backend
+   Penyimpanan dilakukan melalui fungsi simpanKegiatanDemo(payload)
+   ============================================================ */
+const MAX_FOTO_PER_KEGIATAN = 5;
+const MAX_FOTO_ASLI_BYTES = 10 * 1024 * 1024;
+const DEFAULT_ROWS = 3;
+const SECTION_COLORS = {
+  prospek:     { color: "#315be8", soft: "#eaf0ff" },
+  followup:    { color: "#16856d", soft: "#e4f7f0" },
+  proposal:    { color: "#7650bd", soft: "#f0e9ff" },
+  closing:     { color: "#25824a", soft: "#e4f6e9" },
+  lainnya:     { color: "#bd641c", soft: "#fff0e2" },
+  meeting:     { color: "#147ba5", soft: "#e2f5fc" },
+  pengeluaran: { color: "#a87508", soft: "#fff4d5" }
+};
+const SECTIONS = [
+  { id: "prospek", short: "Prospek", title: "1. Prospek", jenis: "Prospek", hint: "Calon pelanggan atau perusahaan yang menjadi target.", cols: [
+    { k: "area", label: "Area" },
+    { k: "segmentasi", label: "Segmentasi" },
+    { k: "target", label: "Target" },
+    { k: "pic", label: "PIC" },
+    { k: "noPic", label: "No. PIC", type: "tel" },
+    { k: "kebutuhan", label: "Kebutuhan" }
+  ]},
+  { id: "followup", short: "Follow-up", title: "2. Follow-up", jenis: "Follow-up", hint: "Tindak lanjut kepada calon pelanggan atau target.", cols: [
+    { k: "area", label: "Area" },
+    { k: "segmentasi", label: "Segmentasi" },
+    { k: "target", label: "Target" },
+    { k: "pic", label: "PIC" },
+    { k: "noPic", label: "No. PIC", type: "tel" },
+    { k: "keterangan", label: "Keterangan" }
+  ]},
+  { id: "proposal", short: "Proposal", title: "3. Surat Penawaran / Proposal", jenis: "Surat Penawaran/Proposal", hint: "Pilih jenis surat dan jenis penawaran sesuai kegiatan.", cols: [
+    { k: "segmentasi", label: "Segmentasi" },
+    { k: "target", label: "Target" },
+    { k: "pic", label: "PIC" },
+    { k: "jenisSurat", label: "Jenis Surat" },
+    { k: "noSurat", label: "No. Surat" },
+    { k: "jenisPenawaran", label: "Jenis Penawaran" }
+  ]},
+  { id: "closing", short: "Closing", title: "4. Closing", jenis: "Closing", hint: "Omzet diisi dalam rupiah. Baris tetap disimpan meskipun hanya satu kolom terisi.", cols: [
+    { k: "area", label: "Area" },
+    { k: "segmentasi", label: "Segmentasi" },
+    { k: "target", label: "Target" },
+    { k: "pic", label: "PIC" },
+    { k: "noPic", label: "No. PIC", type: "tel" },
+    { k: "omzet", label: "Omzet", type: "money" },
+    { k: "keterangan", label: "Keterangan" }
+  ]},
+  { id: "lainnya", short: "Lainnya", title: "5. Lainnya", jenis: "Lainnya", hint: "Untuk kegiatan di luar kategori utama.", cols: [
+    { k: "namaKegiatan", label: "Nama Kegiatan" },
+    { k: "keterangan", label: "Keterangan Kegiatan", type: "textarea" }
+  ]},
+  { id: "meeting", short: "Meeting", title: "6. Meeting / Negosiasi", jenis: "Meeting/Negosiasi", hint: "Maksimal 5 foto per baris, maksimal 10 MB per foto sebelum kompresi.", cols: [
+    { k: "keteranganHasil", label: "Keterangan / Hasil", type: "textarea" },
+    { k: "foto", label: "Upload Foto", type: "file", multiple: true, max: MAX_FOTO_PER_KEGIATAN }
+  ]},
+  { id: "pengeluaran", short: "Pengeluaran", title: "7. Pengeluaran Harian", jenis: "Pengeluaran Harian", hint: "Setiap baris adalah satu transaksi terpisah. Maksimal 5 foto per transaksi.", cols: [
+    { k: "jumlah", label: "Jumlah", type: "money" },
+    { k: "keterangan", label: "Keterangan", type: "textarea" },
+    { k: "foto", label: "Upload Foto Bukti", type: "file", multiple: true, max: MAX_FOTO_PER_KEGIATAN }
+  ]}
+];
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const box = $("#sections"), nav = $("#nav");
+
+/* ===== Render tabel dan navigasi ===== */
+SECTIONS.forEach(sec => {
+  const card = document.createElement("section");
+  card.className = "sec";
+  card.dataset.sec = sec.id;
+  card.innerHTML = `
+    <div class="sec-head">
+      <div><h2>${sec.title}</h2><p class="hint" style="margin:3px 0 0">${sec.hint}</p></div>
+      <button type="button" class="btn-add">＋ Tambah Baris</button>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>No.</th>${sec.cols.map(c => `<th>${c.label}</th>`).join("")}<th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="hint">Baris kosong penuh tidak akan disimpan.</p>`;
+  box.appendChild(card);
+  $(".btn-add", card).addEventListener("click", () => addRow(sec, card, false));
+  for (let i = 0; i < DEFAULT_ROWS; i++) addRow(sec, card, true);
+
+  const b = document.createElement("button");
+  b.type = "button"; b.dataset.go = sec.id;
+  b.innerHTML = `<span>${sec.short}</span><span class="badge zero" data-badge="${sec.id}">0</span>`;
+  b.addEventListener("click", () => {
+    const targetTop = Math.max(0, card.offsetTop - 8);
+    box.scrollTo({ top: targetTop, behavior: "smooth" });
+    markNav(sec.id);
+  });
+  nav.appendChild(b);
+});
+
+function getCurrentSectionId() {
+  const scrollTop = box.scrollTop;
+  const offset = 24;
+  let current = SECTIONS[0].id;
+  SECTIONS.forEach(sec => {
+    const el = $(`[data-sec="${sec.id}"]`);
+    if (el && (el.offsetTop - offset) <= scrollTop) current = sec.id;
+  });
+  return current;
+}
+function markNav(forceId) {
+  const current = forceId || getCurrentSectionId();
+  $$('button[data-go]', nav).forEach(b => {
+    b.classList.toggle("on", b.dataset.go === current);
+  });
+}
+let navTicking = false;
+box.addEventListener("scroll", () => {
+  if (navTicking) return;
+  navTicking = true;
+  requestAnimationFrame(() => {
+    markNav();
+    navTicking = false;
+  });
+});
+window.addEventListener("resize", () => markNav());
+
+function cellHTML(c) {
+  const name = `name="${c.k}" aria-label="${c.label}"`;
+  if (c.type === "file") {
+    return `<input type="file" accept="image/*" multiple ${name} data-max="${c.max}"><div class="thumbs"></div><div class="upload-note">Maks. ${c.max} foto · 10 MB/foto</div>`;
+  }
+  if (c.type === "textarea") return `<textarea ${name} rows="1" placeholder="${c.label}"></textarea>`;
+  if (c.type === "money") return `<div class="money-wrap"><span class="rp">Rp</span><input type="text" inputmode="numeric" data-money ${name} placeholder="0"></div>`;
+  return `<input type="${c.type || "text"}" ${name} placeholder="${c.label}">`;
+}
+function addRow(sec, card, silent) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td class="no"></td>` + sec.cols.map(c => `<td>${cellHTML(c)}</td>`).join("") +
+    `<td class="act"><button type="button" class="btn-del" title="Hapus baris" aria-label="Hapus baris">×</button></td>`;
+  $("tbody", card).appendChild(tr);
+  renumber(card);
+  // Saat render awal, jangan hitung ringkasan sebelum semua section selesai dibuat.
+  // Tanpa pengecekan ini, halaman berhenti setelah section Prospek.
+  if (!silent) {
+    const f = $("input:not([type=file]),select,textarea", tr);
+    if (f) f.focus();
+    updateSummary();
+  }
+}
+function renumber(card) { $$('tbody tr', card).forEach((tr, i) => { $(".no", tr).textContent = i + 1; }); }
+
+/* ===== Validasi tabel dan foto ===== */
+box.addEventListener("click", e => {
+  const del = e.target.closest(".btn-del");
+  if (!del) return;
+  const card = del.closest(".sec"), tr = del.closest("tr"), tbody = $("tbody", card);
+  if (tbody.rows.length <= 1) {
+    $$('input,select,textarea', tr).forEach(el => { el.value = ""; });
+    $$('.thumbs', tr).forEach(t => { t.textContent = ""; t.classList.remove("err"); });
+  } else tr.remove();
+  renumber(card); updateSummary();
+});
+box.addEventListener("input", e => {
+  const el = e.target;
+  if (el.hasAttribute("data-money")) {
+    const digits = el.value.replace(/\D/g, "");
+    el.value = digits ? Number(digits).toLocaleString("id-ID") : "";
+  }
+  updateSummary();
+});
+box.addEventListener("change", e => {
+  const el = e.target;
+  if (el.type === "file") validateFiles(el);
+  updateSummary();
+});
+function validateFiles(input) {
+  const files = [...input.files], max = Number(input.dataset.max || MAX_FOTO_PER_KEGIATAN);
+  const thumbs = $(".thumbs", input.parentElement);
+  const tooLarge = files.find(f => f.size > MAX_FOTO_ASLI_BYTES);
+  if (files.length > max) {
+    input.value = ""; thumbs.className = "thumbs err"; thumbs.textContent = `Maksimal ${max} foto per kegiatan. Pilih ulang.`; return false;
+  }
+  if (tooLarge) {
+    input.value = ""; thumbs.className = "thumbs err"; thumbs.textContent = `${tooLarge.name} melebihi 10 MB. Pilih foto yang lebih kecil.`; return false;
+  }
+  thumbs.className = "thumbs";
+  thumbs.textContent = files.length ? files.map(f => f.name).join(", ") : "";
+  return true;
+}
+
+/* ===== Informasi global dan tanggal ===== */
+const tanggal = $("#tanggal");
+const todayStr = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date()).reduce((out, part) => {
+    if (part.type !== "literal") out[part.type] = part.value;
+    return out;
+  }, {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+tanggal.value = todayStr();
+// Ganti warna tema global sesuai departemen, seperti pada file HTML asli.
+// Warna navigasi dan header tabel mengikuti departemen yang dipilih.
+const DEPARTEMEN_TEMA = {
+  Pancasula: { utama: "#3b6fd4", lembut: "#e8effc" },
+  Litani: { utama: "#2e9e5b", lembut: "#e5f5eb" },
+  Daharan: { utama: "#c99a06", lembut: "#fff4d5" }
+};
+function terapkanTemaDepartemen(nama) {
+  const tema = DEPARTEMEN_TEMA[nama];
+  if (!tema) {
+    document.documentElement.style.removeProperty("--accent");
+    document.documentElement.style.removeProperty("--accent-soft");
+    return;
+  }
+  document.documentElement.style.setProperty("--accent", tema.utama);
+  document.documentElement.style.setProperty("--accent-soft", tema.lembut);
+}
+$("#dept").addEventListener("change", e => {
+  if (e.target && e.target.name === "dept") {
+    terapkanTemaDepartemen(e.target.value);
+  }
+  $("#err-dept").classList.remove("show");
+});
+$("#namaUser").addEventListener("change", () => {
+  $("#namaUser").classList.remove("invalid"); $("#err-nama").classList.remove("show");
+});
+
+/* ===== Ringkasan dan pengumpulan data ===== */
+function rowFilled(tr) {
+  return $$('input,select,textarea', tr).some(el => {
+    if (el.type === "file") return el.files && el.files.length > 0;
+    return String(el.value || "").trim() !== "";
+  });
+}
+function updateSummary() {
+  let total = 0;
+  $("#summary").innerHTML = SECTIONS.map(sec => {
+    const card = $(`[data-sec="${sec.id}"]`);
+    const count = $$('tbody tr', card).filter(rowFilled).length;
+    total += count;
+    const badge = $(`[data-badge="${sec.id}"]`);
+    badge.textContent = count; badge.classList.toggle("zero", count === 0);
+    return `<li class="${count ? "" : "zero"}"><span>${sec.short} terisi</span><b>${count} baris</b></li>`;
+  }).join("") + `<li class="total"><span>Total akan disimpan</span><b>${total} kegiatan</b></li>`;
+  return total;
+}
+function collectRawActivities() {
+  const activities = [];
+  SECTIONS.forEach(sec => {
+    const card = $(`[data-sec="${sec.id}"]`);
+    $$('tbody tr', card).filter(rowFilled).forEach(tr => {
+      const data = {}, files = [];
+      sec.cols.forEach(c => {
+        const el = $(`[name="${c.k}"]`, tr);
+        if (c.type === "file") files.push(...[...(el.files || [])]);
+        else if (c.type === "money") { const digits = String(el.value).replace(/\D/g, ""); data[c.k] = digits === "" ? "" : Number(digits); }
+        else data[c.k] = String(el.value || "").trim();
+      });
+      activities.push({ jenisKegiatan: sec.jenis, data, files });
+    });
+  });
+  return activities;
+}
+
+/* Kompresi foto besar di browser agar transfer ke Apps Script lebih stabil. */
+function readBlobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Tidak dapat membaca file foto."));
+    reader.readAsDataURL(blob);
+  });
+}
+function loadImageForCompression(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Browser tidak dapat membaca format foto ini.")); };
+    img.src = url;
+  });
+}
+function canvasToBlob(canvas, quality) {
+  return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+}
+async function preparePhoto(file) {
+  if (file.size > MAX_FOTO_ASLI_BYTES) throw new Error(`Foto ${file.name} melebihi 10 MB.`);
+  let blob = file, fileName = file.name, mimeType = file.type || "application/octet-stream";
+  try {
+    const image = await loadImageForCompression(file);
+    const longest = Math.max(image.naturalWidth, image.naturalHeight);
+    if (file.size > 850 * 1024 || longest > 1800) {
+      let scale = Math.min(1, 1800 / longest);
+      let canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      let ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let compressed = await canvasToBlob(canvas, 0.84);
+      if (compressed && compressed.size > 1200 * 1024) compressed = await canvasToBlob(canvas, 0.72);
+      if (compressed && compressed.size > 1200 * 1024) {
+        const scale2 = Math.min(1, 1400 / Math.max(canvas.width, canvas.height));
+        const c2 = document.createElement("canvas");
+        c2.width = Math.max(1, Math.round(canvas.width * scale2));
+        c2.height = Math.max(1, Math.round(canvas.height * scale2));
+        c2.getContext("2d").drawImage(canvas, 0, 0, c2.width, c2.height);
+        compressed = await canvasToBlob(c2, 0.72);
+      }
+      if (compressed && compressed.size < file.size) {
+        blob = compressed; mimeType = "image/jpeg";
+        fileName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+      }
+    }
+  } catch (err) {
+    // Jika browser tidak mendukung format tertentu, kirim file asli selama masih dalam batas ukuran.
+    if (file.size > MAX_FOTO_ASLI_BYTES) throw err;
+  }
+  const dataUrl = await readBlobAsDataUrl(blob);
+  return {
+    namaFile: fileName,
+    mimeType,
+    ukuranAsliBytes: file.size,
+    ukuranSimpanBytes: blob.size,
+    dataBase64: dataUrl.substring(dataUrl.indexOf(",") + 1)
+  };
+}
+async function buildPayload() {
+  const nama = $("#namaUser").value;
+  const dept = $('input[name="dept"]:checked');
+  const activitiesRaw = collectRawActivities();
+  const kegiatan = [];
+  for (const activity of activitiesRaw) {
+    const foto = [];
+    for (const file of activity.files) foto.push(await preparePhoto(file));
+    kegiatan.push({ jenisKegiatan: activity.jenisKegiatan, data: activity.data, foto });
+  }
+  return {
+    user: nama,
+    departemen: dept.value,
+    tanggal: tanggal.value || todayStr(),
+    kegiatan
+  };
+}
+
+/* ===== Kirim ke backend Apps Script ===== */
+function toast(msg, isError) {
+  const t = $("#toast");
+  t.textContent = msg; t.className = "show" + (isError ? " error" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.className = ""; }, 6000);
+}
+function resetForm(keepGlobal) {
+  SECTIONS.forEach(sec => {
+    const card = $(`[data-sec="${sec.id}"]`);
+    $("tbody", card).innerHTML = "";
+    for (let i = 0; i < DEFAULT_ROWS; i++) addRow(sec, card, true);
+  });
+  if (!keepGlobal) {
+    $("#namaUser").value = ""; tanggal.value = todayStr();
+    $$('input[name="dept"]').forEach(r => { r.checked = false; });
+    terapkanTemaDepartemen("");
+  }
+  updateSummary(); markNav();
+}
+$("#btnSave").addEventListener("click", async () => {
+  let valid = true;
+  const nama = $("#namaUser"), dept = $('input[name="dept"]:checked');
+  if (!nama.value) { nama.classList.add("invalid"); $("#err-nama").classList.add("show"); valid = false; }
+  if (!dept) { $("#err-dept").classList.add("show"); valid = false; }
+  if (!valid) { toast("Pilih nama anggota dan satu departemen terlebih dahulu.", true); return; }
+  const total = updateSummary();
+  if (!total) { toast("Belum ada kegiatan yang diisi.", true); return; }
+  const btn = $("#btnSave"); btn.disabled = true;
+  try {
+    const payload = await buildPayload();
+    if (!(window.google && google.script && google.script.run)) {
+      console.log("Payload pratinjau Marketing Control:", payload);
+      toast("Mode pratinjau lokal: data sudah disiapkan, tetapi belum dikirim. Buka aplikasi melalui URL Web App Apps Script untuk menyimpan.", true);
+      btn.disabled = false;
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(result => {
+        btn.disabled = false;
+        if (!result || result.success !== true) {
+          toast((result && result.message) || "Server tidak mengonfirmasi penyimpanan.", true); return;
+        }
+        toast(`Berhasil menyimpan ${result.totalKegiatan} kegiatan dan ${result.totalFoto} foto ke database.`);
+        resetForm(true);
+      })
+      .withFailureHandler(error => {
+        btn.disabled = false;
+        toast("Gagal menyimpan: " + (error && error.message ? error.message : error), true);
+      })
+      .simpanKegiatanDemo(payload);
+  } catch (error) {
+    btn.disabled = false;
+    toast("Gagal menyiapkan data: " + error.message, true);
+  }
+});
+$("#btnReset").addEventListener("click", () => {
+  if (confirm("Reset seluruh isian form?")) { resetForm(false); toast("Form berhasil direset."); }
+});
+
+updateSummary();
+markNav("prospek");
+</script>
+</body>
+</html>
